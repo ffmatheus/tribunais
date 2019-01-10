@@ -1,0 +1,1 @@
+install chrome or chormium
