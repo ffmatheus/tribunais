@@ -79,6 +79,8 @@
                 </div>
             @endif
 
+            <example-component></example-component>
+
             <div class="content">
                 <div class="title m-b-md">
                     Laravel
