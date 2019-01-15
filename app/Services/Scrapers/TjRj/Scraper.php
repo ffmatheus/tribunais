@@ -2,12 +2,13 @@
 
 namespace App\Services\Scrapers\TjRj;
 
-use App\Data\Repositories\Proceedings;
-use Laravel\Dusk\Browser;
+use DB;
 use Tests\DuskTestCase;
+use App\Data\Models\Log;
+use Laravel\Dusk\Browser;
 use Facebook\WebDriver\WebDriverBy;
 use App\Data\Repositories\SearchTerms;
-use App\Data\Repositories\Proceeding;
+use App\Data\Repositories\Proceedings;
 
 class Scraper extends DuskTestCase
 {
@@ -26,6 +27,15 @@ class Scraper extends DuskTestCase
     public $search;
 
     public $year;
+
+    public $found;
+
+    private function cleanLog()
+    {
+        DB::table('log')
+            ->where('created_at', '<', now()->subYear())
+            ->delete();
+    }
 
     private function getPages()
     {
@@ -49,6 +59,8 @@ class Scraper extends DuskTestCase
 
     private function import()
     {
+        $this->cleanLog();
+
         $number = isset($this->buffer[0]) ? $this->buffer[0] : null;
 
         if ($number && $number !== 'Nenhum resultado encontrado') {
@@ -59,6 +71,8 @@ class Scraper extends DuskTestCase
                 $this->search,
                 $this->year
             );
+
+            $this->found++;
         }
 
         $this->buffer = [];
@@ -71,6 +85,8 @@ class Scraper extends DuskTestCase
         $this->search = $search;
 
         $this->year = $year;
+
+        $this->found = 0;
 
         $this->browse(function (Browser $browser) {
             $this->browser = $browser;
@@ -111,11 +127,15 @@ class Scraper extends DuskTestCase
         app(SearchTerms::class)
             ->all()
             ->each(function ($searchTerm) {
-                $this->scrapeCourt(
-                    static::COURT,
-                    $searchTerm->text,
-                    now()->year
-                );
+                Log::create([
+                    'search_term' => $searchTerm->text,
+
+                    'found' => $this->scrapeCourt(
+                        static::COURT,
+                        $searchTerm->text,
+                        now()->year
+                    ),
+                ]);
             });
     }
 }
