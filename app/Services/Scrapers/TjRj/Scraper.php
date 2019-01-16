@@ -10,6 +10,11 @@ use Facebook\WebDriver\WebDriverBy;
 use App\Data\Repositories\SearchTerms;
 use App\Data\Repositories\Proceedings;
 
+use Facebook\WebDriver\Chrome\ChromeOptions;
+use Facebook\WebDriver\Remote\DesiredCapabilities;
+use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Laravel\Dusk\Chrome\ChromeProcess;
+
 class Scraper extends DuskTestCase
 {
     const URL = 'http://www4.tjrj.jus.br/ConsultaUnificada/consulta.do';
@@ -30,6 +35,8 @@ class Scraper extends DuskTestCase
 
     public $found;
 
+    public $localBrowser;
+
     private function cleanLog()
     {
         DB::table('log')
@@ -37,11 +44,16 @@ class Scraper extends DuskTestCase
             ->delete();
     }
 
+    private function getBrowser()
+    {
+        return $this->localBrowser;
+    }
+
     private function getPages()
     {
         try {
-            $options = $this->browser->resolver
-                ->resolveForSelection('pagina')
+            $options = $this->getBrowser()
+                ->resolver->resolveForSelection('pagina')
                 ->findElements(WebDriverBy::tagName('option'));
         } catch (\Exception $exception) {
             return collect([]);
@@ -78,7 +90,7 @@ class Scraper extends DuskTestCase
         $this->buffer = [];
     }
 
-    private function scrapeCourt($court, $search, $year)
+    public function scrapeCourt($court, $search, $year)
     {
         $this->court = $court;
 
@@ -88,38 +100,51 @@ class Scraper extends DuskTestCase
 
         $this->found = 0;
 
-        $this->browse(function (Browser $browser) {
-            $this->browser = $browser;
+        $this->getBrowser()
+            ->visit(static::URL)
+            ->click("a[href='#tabs-nome-indice1']")
+            ->select('origem', 2)
+            ->type('nomeParte', $this->search)
+            ->type('anoInicio', $this->year)
+            ->type('anoFinal', $this->year)
+            ->click('#pesquisa')
+            ->waitForText('Resultado da pesquisa', 10);
 
-            $browser
-                ->visit(static::URL)
-                ->click("a[href='#tabs-nome-indice1']")
-                ->select('origem', 2)
-                ->type('nomeParte', $this->search)
-                ->type('anoInicio', $this->year)
-                ->type('anoFinal', $this->year)
-                ->click('#pesquisa')
-                ->waitForText('Resultado da pesquisa', 10);
+        $this->getPages()
+            ->prepend('0')
+            ->each(function ($page) {
+                if ($page !== '0') {
+                    $this->getBrowser()->select('pagina', $page);
 
-            $this->getPages()
-                ->prepend('0')
-                ->each(function ($page) {
-                    if ($page !== '0') {
-                        $this->browser->select('pagina', $page);
+                    sleep(1);
+                }
 
-                        sleep(1);
-                    }
-
-                    collect(
-                        $this->browser
-                            ->element('form[name="consultaNomeForm"]')
-                            ->findElements(WebDriverBy::tagName('table'))[2]
-                            ->findElements(WebDriverBy::tagName('tr'))
-                    )->each(function ($element) {
-                        $this->addLine($element->getText());
-                    });
+                collect(
+                    $this->getBrowser()
+                        ->element('form[name="consultaNomeForm"]')
+                        ->findElements(WebDriverBy::tagName('table'))[2]
+                        ->findElements(WebDriverBy::tagName('tr'))
+                )->each(function ($element) {
+                    $this->addLine($element->getText());
                 });
-        });
+            });
+    }
+
+    public function scrape()
+    {
+        app(SearchTerms::class)
+            ->all()
+            ->each(function ($searchTerm) {
+                Log::create([
+                    'search_term' => $searchTerm->text,
+
+                    'found' => $this->scrapeCourt(
+                        static::COURT,
+                        $searchTerm->text,
+                        now()->year
+                    ),
+                ]);
+            });
     }
 
     public function testScrape()
@@ -137,5 +162,43 @@ class Scraper extends DuskTestCase
                     ),
                 ]);
             });
+    }
+
+    public function makeBrowser()
+    {
+        $process = (new ChromeProcess())->toProcess();
+
+        $process->start();
+
+        $options = (new ChromeOptions())->addArguments([
+            '--disable-gpu',
+            '--headless',
+        ]);
+
+        $capabilities = DesiredCapabilities::chrome()->setCapability(
+            ChromeOptions::CAPABILITY,
+            $options
+        );
+
+        $driver = retry(
+            5,
+            function () use ($capabilities) {
+                return RemoteWebDriver::create(
+                    'http://localhost:9515',
+                    $capabilities
+                );
+            },
+            50
+        );
+
+        $this->localBrowser = new Browser($driver);
+
+        //        $browser->visit('https://www.google.com');
+        //
+        //        $browser->quit();
+        //
+        //        $process->stop();
+
+        return $this;
     }
 }
