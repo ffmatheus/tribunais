@@ -36,6 +36,46 @@ class Scraper extends DuskTestCase
 
     public $localBrowser;
 
+    private function __scrapeCourt($court, $search, $year)
+    {
+        $this->court = $court;
+
+        $this->search = $search;
+
+        $this->year = $year;
+
+        $this->found = 0;
+
+        $this->getBrowser()
+             ->visit(static::URL)
+             ->click("a[href='#tabs-nome-indice1']")
+             ->select('origem', 2)
+             ->type('nomeParte', $this->search)
+             ->type('anoInicio', $this->year)
+             ->type('anoFinal', $this->year)
+             ->click('#pesquisa')
+             ->waitForText('Resultado da pesquisa', 10);
+
+        $this->getPages()
+             ->prepend('0')
+             ->each(function ($page) {
+                 if ($page !== '0') {
+                     $this->getBrowser()->select('pagina', $page);
+
+                     sleep(1);
+                 }
+
+                 collect(
+                     $this->getBrowser()
+                          ->element('form[name="consultaNomeForm"]')
+                          ->findElements(WebDriverBy::tagName('table'))[2]
+                         ->findElements(WebDriverBy::tagName('tr'))
+                 )->each(function ($element) {
+                     $this->addLine($element->getText());
+                 });
+             });
+    }
+
     private function cleanLog()
     {
         DB::table('log')
@@ -91,42 +131,11 @@ class Scraper extends DuskTestCase
 
     public function scrapeCourt($court, $search, $year)
     {
-        $this->court = $court;
-
-        $this->search = $search;
-
-        $this->year = $year;
-
-        $this->found = 0;
-
-        $this->getBrowser()
-            ->visit(static::URL)
-            ->click("a[href='#tabs-nome-indice1']")
-            ->select('origem', 2)
-            ->type('nomeParte', $this->search)
-            ->type('anoInicio', $this->year)
-            ->type('anoFinal', $this->year)
-            ->click('#pesquisa')
-            ->waitForText('Resultado da pesquisa', 10);
-
-        $this->getPages()
-            ->prepend('0')
-            ->each(function ($page) {
-                if ($page !== '0') {
-                    $this->getBrowser()->select('pagina', $page);
-
-                    sleep(1);
-                }
-
-                collect(
-                    $this->getBrowser()
-                        ->element('form[name="consultaNomeForm"]')
-                        ->findElements(WebDriverBy::tagName('table'))[2]
-                        ->findElements(WebDriverBy::tagName('tr'))
-                )->each(function ($element) {
-                    $this->addLine($element->getText());
-                });
-            });
+        try {
+            $this->__scrapeCourt($court, $search, $year);
+        } catch (\Exception $exception) {
+            $this->__scrapeCourt($court, $search, $year);
+        }
     }
 
     public function scrape()
