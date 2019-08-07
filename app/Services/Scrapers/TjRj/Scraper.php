@@ -9,11 +9,10 @@ use Laravel\Dusk\Browser;
 use Facebook\WebDriver\WebDriverBy;
 use App\Data\Repositories\SearchTerms;
 use App\Data\Repositories\Proceedings;
-
-use Facebook\WebDriver\Chrome\ChromeOptions;
-use Facebook\WebDriver\Remote\DesiredCapabilities;
-use Facebook\WebDriver\Remote\RemoteWebDriver;
 use Laravel\Dusk\Chrome\ChromeProcess;
+use Facebook\WebDriver\Chrome\ChromeOptions;
+use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Facebook\WebDriver\Remote\DesiredCapabilities;
 
 class Scraper extends DuskTestCase
 {
