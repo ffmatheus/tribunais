@@ -37,19 +37,19 @@ class Scraper extends DuskTestCase
 
     public $localBrowser;
 
-    private function cleanLog()
+    protected function cleanLog()
     {
         DB::table('log')
             ->where('created_at', '<', now()->subYear())
             ->delete();
     }
 
-    private function getBrowser()
+    protected function getBrowser()
     {
         return $this->localBrowser;
     }
 
-    private function getPages()
+    protected function getPages()
     {
         try {
             $options = $this->getBrowser()
@@ -64,12 +64,12 @@ class Scraper extends DuskTestCase
         });
     }
 
-    private function addLine($line)
+    protected function addLine($line)
     {
         return empty(trim($line)) ? $this->import() : ($this->buffer[] = $line);
     }
 
-    private function import()
+    protected function import()
     {
         $this->cleanLog();
 
@@ -142,7 +142,7 @@ class Scraper extends DuskTestCase
                         static::COURT,
                         $searchTerm->text,
                         now()->year
-                    ),
+                    )
                 ]);
             });
     }
@@ -159,20 +159,22 @@ class Scraper extends DuskTestCase
                         static::COURT,
                         $searchTerm->text,
                         now()->year
-                    ),
+                    )
                 ]);
             });
     }
 
     public function makeBrowser()
     {
+        static::startChromeDriver();
+
         $process = (new ChromeProcess())->toProcess();
 
         $process->start();
 
         $options = (new ChromeOptions())->addArguments([
             '--disable-gpu',
-            '--headless',
+            '--headless'
         ]);
 
         $capabilities = DesiredCapabilities::chrome()->setCapability(
