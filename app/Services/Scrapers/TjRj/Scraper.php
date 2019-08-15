@@ -143,18 +143,14 @@ class Scraper extends DuskTestCase
         app(SearchTerms::class)
             ->all()
             ->each(function ($searchTerm) {
-                $found = $this->scrapeCourt(
-                    static::COURT,
-                    $searchTerm->text,
-                    now()->year
-                );
-
-                dump('saving log');
-
                 Log::create([
                     'search_term' => $searchTerm->text,
 
-                    'found' => $found
+                    'found' => $this->scrapeCourt(
+                        static::COURT,
+                        $searchTerm->text,
+                        now()->year
+                    )
                 ]);
             });
     }
